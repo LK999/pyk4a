@@ -1491,7 +1491,7 @@ static PyMethodDef Pyk4aMethods[] = {
     {"record_write_capture", record_write_capture, METH_VARARGS, "Writes a camera capture to file"},
     {"device_get_installed_count", device_get_installed_count, METH_VARARGS, "Gets the number of connected devices"},
     {"device_get_serialnum", device_get_serialnum, METH_VARARGS, "Get the Azure Kinect device serial number."},
-    {"is_body_tracking_supported", is_body_tracking_supported, METH_VARARGS, "is_body_tracking_supported"}
+    {"is_body_tracking_supported", is_body_tracking_supported, METH_VARARGS, "is_body_tracking_supported"},
 
     {NULL, NULL, 0, NULL}};
 
