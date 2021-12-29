@@ -548,6 +548,37 @@ k4a_result_t k4a_image_to_numpy(k4a_image_t* img_src, PyArrayObject** img_dst){
     return K4A_RESULT_SUCCEEDED;
 }
 
+k4a_result_t numpy_to_k4a_image(PyArrayObject* img_src, k4a_image_t* img_dst,
+            k4a_image_format_t format){
+
+        int width_pixels = img_src->dimensions[1];
+        int height_pixels = img_src->dimensions[0];
+        int pixel_size;
+
+        switch (format){
+            case K4A_IMAGE_FORMAT_DEPTH16:
+                pixel_size = (int)sizeof(uint16_t);
+                break;
+            case K4A_IMAGE_FORMAT_COLOR_BGRA32:
+                pixel_size = (int)sizeof(uint32_t);
+                break;
+            case K4A_IMAGE_FORMAT_CUSTOM16:
+                pixel_size = (unsigned int)sizeof(int16_t);
+                break;
+            default:
+                // Not supported
+                return K4A_RESULT_FAILED;
+        }
+
+        return k4a_image_create_from_buffer(
+                format,
+                width_pixels, height_pixels,
+                width_pixels * pixel_size,
+                (uint8_t*) img_src->data,
+                width_pixels * height_pixels * pixel_size,
+                NULL, NULL, img_dst);
+    }
+  
 static PyObject *color_image_get_exposure_usec(PyObject *self, PyObject *args) {
   k4a_capture_t *capture_handle;
   PyObject *capsule;
