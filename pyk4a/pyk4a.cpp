@@ -1462,7 +1462,7 @@ static PyObject* is_body_tracking_supported(PyObject* self,PyObject* args) {
         thread_state = _gil_release(thread_safe);
         k4abt_tracker_configuration_t tracker_configuration = K4ABT_TRACKER_CONFIG_DEFAULT;
         // tracker_configuration.processing_mode = K4ABT_TRACKER_PROCESSING_MODE_CPU;
-        tracker_configuration.processing_mode = K4ABT_TRACKER_PROCESSING_MODE_GPU;
+        tracker_configuration.processing_mode = K4ABT_TRACKER_PROCESSING_MODE_GPU_CUDA;
         k4abt_tracker_t* body_tracker_handle = (k4abt_tracker_t*) malloc(sizeof(k4abt_tracker_t));
         result = k4abt_tracker_create(calibration_handle, tracker_configuration, body_tracker_handle);
         _gil_restore(thread_state);
