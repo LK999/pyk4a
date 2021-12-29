@@ -1,12 +1,11 @@
 import sys
 from typing import Any, Optional, Tuple
 
-import k4a_module
-
 from .calibration import Calibration
 from .capture import PyK4ACapture
 from .config import ColorControlCommand, ColorControlMode, Config
 from .errors import K4AException, _verify_error
+from .module import k4a_module
 
 
 if sys.version_info < (3, 8):
@@ -140,6 +139,14 @@ class PyK4A:
         res, imu_sample = k4a_module.device_get_imu_sample(self._device_handle, self.thread_safe, timeout)
         _verify_error(res)
         return imu_sample
+
+    @property
+    def serial(self) -> str:
+        self._validate_is_opened()
+        ret = k4a_module.device_get_serialnum(self._device_handle, self.thread_safe)
+        if ret == "":
+            raise K4AException("Cannot read serial")
+        return ret
 
     @property
     def calibration_raw(self) -> str:
