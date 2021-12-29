@@ -23,6 +23,7 @@ class Calibration:
     ):
         self._calibration_handle = handle
         self._transformation_handle: Optional[object] = None
+        self._body_tracker_handle: Optional[object] = None
         self.thread_safe = thread_safe
         self._depth_mode = depth_mode
         self._color_resolution = color_resolution
@@ -183,3 +184,12 @@ class Calibration:
             raise ValueError("Unknown camera calibration type")
 
         return np.array([params[4], params[5], params[13], params[12], *params[6:10]])
+    @property
+    def body_tracker_handle(self) -> object:
+        if not self._body_tracker_handle:
+            assert k4a_module.is_body_tracking_supported()
+            handle = k4a_module.body_tracker_create(self._calibration_handle, self.thread_safe)
+            if not handle:
+                raise K4AException("Cannot create body tracker handle")
+            self._body_tracker_handle = handle
+        return self._body_tracker_handle

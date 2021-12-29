@@ -4,6 +4,12 @@
 #include <k4a/k4a.h>
 #include <k4arecord/playback.h>
 #include <k4arecord/record.h>
+
+#ifdef ENABLE_BODY_TRACKING
+#include <k4abt.h>
+#pragma message("Body tracking enabled")
+#define DATA_PER_JOINT 11
+#endif
 #include <stdio.h>
 
 #ifdef __cplusplus
@@ -541,32 +547,65 @@ k4a_result_t k4a_image_to_numpy(k4a_image_t *img_src, PyArrayObject **img_dst) {
   return K4A_RESULT_SUCCEEDED;
 }
 
-k4a_result_t numpy_to_k4a_image(PyArrayObject *img_src, k4a_image_t *img_dst, k4a_image_format_t format) {
+k4a_result_t k4a_image_to_numpy(k4a_image_t* img_src, PyArrayObject** img_dst){
+    uint8_t* buffer = k4a_image_get_buffer(*img_src);
+    npy_intp dims[3];
 
-  int width_pixels = img_src->dimensions[1];
-  int height_pixels = img_src->dimensions[0];
-  int pixel_size;
+    k4a_image_format_t format = k4a_image_get_format(*img_src);
+    switch (format){
+        case K4A_IMAGE_FORMAT_COLOR_BGRA32:
+            dims[0] = k4a_image_get_height_pixels(*img_src);
+            dims[1] = k4a_image_get_width_pixels(*img_src);
+            dims[2] = 4;
+            *img_dst = (PyArrayObject*) PyArray_SimpleNewFromData(3, dims, NPY_UINT8, buffer);
+            break;
+        case K4A_IMAGE_FORMAT_COLOR_MJPG:
+            dims[0] = k4a_image_get_size(*img_src);
+            *img_dst = (PyArrayObject*) PyArray_SimpleNewFromData(1, dims, NPY_UINT8, buffer);
+            break;
+        case K4A_IMAGE_FORMAT_COLOR_YUY2:
+            dims[0] = k4a_image_get_height_pixels(*img_src);
+            dims[1] = k4a_image_get_width_pixels(*img_src);
+            dims[2] = 2;
+            *img_dst = (PyArrayObject*) PyArray_SimpleNewFromData(3, dims, NPY_UINT8, buffer);
+            break;
+        case K4A_IMAGE_FORMAT_COLOR_NV12:
+            dims[0] = k4a_image_get_height_pixels(*img_src);
+            dims[0] += dims[0] /2;
+            dims[1] = k4a_image_get_width_pixels(*img_src);
+            dims[2] = 1;
+            *img_dst = (PyArrayObject*) PyArray_SimpleNewFromData(3, dims, NPY_UINT8, buffer);
+            break;
+        case K4A_IMAGE_FORMAT_CUSTOM16:
+        case K4A_IMAGE_FORMAT_DEPTH16:
+        case K4A_IMAGE_FORMAT_IR16:
+            dims[0] = k4a_image_get_height_pixels(*img_src);
+            dims[1] = k4a_image_get_width_pixels(*img_src);
+            *img_dst = (PyArrayObject*) PyArray_SimpleNewFromData(2, dims, NPY_UINT16, buffer);
+            break;
+        case K4A_IMAGE_FORMAT_CUSTOM:
+            // xyz in uint16 format
+            dims[0] = k4a_image_get_height_pixels(*img_src);
+            dims[1] = k4a_image_get_width_pixels(*img_src);
+            dims[2] = 3;
+            *img_dst = (PyArrayObject*) PyArray_SimpleNewFromData(3, dims, NPY_INT16, buffer);
+            break;
+        case K4A_IMAGE_FORMAT_CUSTOM8:
+            dims[0] = k4a_image_get_height_pixels(*img_src);
+            dims[1] = k4a_image_get_width_pixels(*img_src);
+            dims[2] = 1;
+            *img_dst = (PyArrayObject*) PyArray_SimpleNewFromData(3, dims, NPY_UINT8, buffer);
+            break;
+        default:
+            // Not supported
+            return K4A_RESULT_FAILED;
+    }
 
-  switch (format) {
-  case K4A_IMAGE_FORMAT_DEPTH16:
-  case K4A_IMAGE_FORMAT_CUSTOM16:
-  case K4A_IMAGE_FORMAT_IR16:
-    pixel_size = (int)sizeof(uint16_t);
-    break;
-  case K4A_IMAGE_FORMAT_COLOR_BGRA32:
-    pixel_size = (int)sizeof(uint32_t);
-    break;
-  case K4A_IMAGE_FORMAT_CUSTOM8:
-    pixel_size = (int)sizeof(uint8_t);
-    break;
-  default:
-    // Not supported
-    return K4A_RESULT_FAILED;
-  }
+    PyObject *capsule = PyCapsule_New(buffer, NULL, capsule_cleanup_image);
+    PyCapsule_SetContext(capsule, img_src);
+    PyArray_SetBaseObject((PyArrayObject *) *img_dst, capsule);
 
-  return k4a_image_create_from_buffer(format, width_pixels, height_pixels, width_pixels * pixel_size,
-                                      (uint8_t *)img_src->data, width_pixels * height_pixels * pixel_size, NULL, NULL,
-                                      img_dst);
+    return K4A_RESULT_SUCCEEDED;
 }
 
 static PyObject *color_image_get_exposure_usec(PyObject *self, PyObject *args) {
@@ -1493,6 +1532,205 @@ static int pyk4a_clear(PyObject *m) {
   Py_CLEAR(GETSTATE(m)->error);
   return 0;
 }
+
+static PyObject* is_body_tracking_supported(PyObject* self,PyObject* args) {
+#ifdef ENABLE_BODY_TRACKING
+#pragma message("is_body_tracking_supported True")
+        return Py_True;
+#else
+#pragma message("is_body_tracking_supported False")
+        return Py_False;
+#endif
+    }
+
+
+#ifdef ENABLE_BODY_TRACKING
+    const char* CAPSULE_BODY_TRACKER_NAME = "pyk4a body tracker handle";
+    const char* CAPSULE_BODY_DATA_NAME = "pyk4a body data";
+
+    static void capsule_cleanup_body_tracker(PyObject *capsule) {
+        k4abt_tracker_t *body_tracker = (k4abt_tracker_t*)PyCapsule_GetPointer(capsule, CAPSULE_BODY_TRACKER_NAME);
+        k4abt_tracker_destroy(*body_tracker);
+        free(body_tracker);
+    }
+
+    static void capsule_cleanup_body_data(PyObject *capsule) {
+        fprintf(stdout, "free called on body data");
+        void* buffer = PyCapsule_GetPointer(capsule, CAPSULE_BODY_DATA_NAME);
+        free(buffer);
+    }
+
+    static PyObject* body_tracker_create(PyObject* self, PyObject *args) {
+        k4a_calibration_t* calibration_handle;
+        PyObject *calibration_capsule;
+        int thread_safe;
+        PyThreadState *thread_state;
+        k4a_result_t result;
+
+        PyArg_ParseTuple(args, "Op", &calibration_capsule, &thread_safe);
+        calibration_handle = (k4a_calibration_t*)PyCapsule_GetPointer(calibration_capsule, CAPSULE_CALIBRATION_NAME);
+
+        thread_state = _gil_release(thread_safe);
+        k4abt_tracker_configuration_t tracker_configuration = K4ABT_TRACKER_CONFIG_DEFAULT;
+        // tracker_configuration.processing_mode = K4ABT_TRACKER_PROCESSING_MODE_CPU;
+        k4abt_tracker_t* body_tracker_handle = (k4abt_tracker_t*) malloc(sizeof(k4abt_tracker_t));
+        result = k4abt_tracker_create(calibration_handle, tracker_configuration, body_tracker_handle);
+        _gil_restore(thread_state);
+
+        if (result == K4A_RESULT_FAILED) {
+            free(body_tracker_handle);
+            return Py_BuildValue("N", Py_None);
+        }
+
+        PyObject *body_tracker_capsule = PyCapsule_New(body_tracker_handle, CAPSULE_BODY_TRACKER_NAME, capsule_cleanup_body_tracker);
+        return Py_BuildValue("N", body_tracker_capsule);
+    }
+
+    static PyObject* capture_get_body_tracking(PyObject* self, PyObject *args) {
+        int thread_safe;
+        PyThreadState *thread_state;
+        PyObject *capture_capsule;
+        PyObject *calibration_capsule;
+        PyObject *body_tracker_capsule;
+        k4a_capture_t *capture;
+        k4a_calibration_t *calibration;
+        k4abt_tracker_t *body_tracker;
+        k4abt_frame_t body_frame;
+        k4a_wait_result_t wait_res;
+
+        PyArg_ParseTuple(args, "OOOp", &capture_capsule, &calibration_capsule, &body_tracker_capsule, &thread_safe);
+        capture = (k4a_capture_t*)PyCapsule_GetPointer(capture_capsule, CAPSULE_CAPTURE_NAME);
+        calibration = (k4a_calibration_t*)PyCapsule_GetPointer(calibration_capsule, CAPSULE_CALIBRATION_NAME);
+        body_tracker = (k4abt_tracker_t*)PyCapsule_GetPointer(body_tracker_capsule, CAPSULE_BODY_TRACKER_NAME);
+
+        //thread_state = _gil_release(thread_safe);
+        //_gil_restore(thread_state);
+
+        wait_res = k4abt_tracker_enqueue_capture(*body_tracker, *capture, K4A_WAIT_INFINITE);
+        if (wait_res != K4A_WAIT_RESULT_SUCCEEDED ) {
+            fprintf(stderr, "fail to enqueue capture\n");
+            return Py_BuildValue("NN", Py_None, Py_None);
+        }
+        wait_res = k4abt_tracker_pop_result(*body_tracker, &body_frame, K4A_WAIT_INFINITE);
+        if (wait_res == K4A_WAIT_RESULT_SUCCEEDED) {
+            uint32_t num_bodies = k4abt_frame_get_num_bodies(body_frame);
+            if (num_bodies == 0) {
+                k4abt_frame_release(body_frame);
+                return Py_BuildValue("NN", Py_None, Py_None);
+            }
+            k4abt_skeleton_t skeleton;
+            npy_intp dims[3];
+            dims[0] = num_bodies;
+            dims[1] = K4ABT_JOINT_COUNT;
+            dims[2] = DATA_PER_JOINT;
+            size_t body_stride = K4ABT_JOINT_COUNT*DATA_PER_JOINT;
+            float* buffer_pose = (float*) malloc(sizeof(float)*num_bodies*body_stride);
+            if (capture == NULL) {
+                fprintf(stderr, "Cannot allocate memory");
+                return Py_BuildValue("NN", Py_None, Py_None);
+            }
+
+            for (uint32_t body_index = 0; body_index < num_bodies; body_index++) {
+                k4a_result_t result = k4abt_frame_get_body_skeleton(body_frame, body_index, &skeleton);
+                size_t body_offset = body_index * body_stride;
+                for (int joint_index=0; joint_index<K4ABT_JOINT_COUNT; joint_index++) {
+                    size_t offset = body_offset + joint_index * DATA_PER_JOINT;
+                    buffer_pose[offset + 0] = skeleton.joints[joint_index].position.xyz.x;
+                    buffer_pose[offset + 1] = skeleton.joints[joint_index].position.xyz.y;
+                    buffer_pose[offset + 2] = skeleton.joints[joint_index].position.xyz.z;
+                    buffer_pose[offset + 3] = skeleton.joints[joint_index].orientation.wxyz.w;
+                    buffer_pose[offset + 4] = skeleton.joints[joint_index].orientation.wxyz.x;
+                    buffer_pose[offset + 5] = skeleton.joints[joint_index].orientation.wxyz.y;
+                    buffer_pose[offset + 6] = skeleton.joints[joint_index].orientation.wxyz.z;
+                    buffer_pose[offset + 7] = (float) skeleton.joints[joint_index].confidence_level;
+                    // convert to image positions
+                    k4a_float2_t position_image;
+                    int valid;
+                    result = k4a_calibration_3d_to_2d(calibration, &skeleton.joints[joint_index].position, K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_COLOR, &position_image, &valid);
+                    if (result == K4A_RESULT_SUCCEEDED) {
+                        buffer_pose[offset + 8] = position_image.xy.x;
+                        buffer_pose[offset + 9] = position_image.xy.y;
+                        buffer_pose[offset + 10] = (float) valid;
+                    }
+                    else {
+                        buffer_pose[offset + 10] = -1;
+                    }
+                }
+            }
+
+            PyArrayObject* np_body_data = (PyArrayObject*) PyArray_SimpleNewFromData(3, dims, NPY_FLOAT, buffer_pose);
+            PyObject *capsule = PyCapsule_New(buffer_pose, CAPSULE_BODY_DATA_NAME, capsule_cleanup_body_data);
+            PyCapsule_SetContext(capsule, buffer_pose);
+            PyArray_SetBaseObject((PyArrayObject *) np_body_data, capsule);
+
+            PyArrayObject* np_body_index_map;
+            k4a_image_t body_index_map = k4abt_frame_get_body_index_map(body_frame);
+            k4a_image_to_numpy(&body_index_map, &np_body_index_map);
+
+            k4abt_frame_release(body_frame);
+            return Py_BuildValue("OO", np_body_data, np_body_index_map);
+        }
+        else {
+            return Py_BuildValue("NN", Py_None, Py_None);
+        }
+    }
+
+#endif
+
+    struct module_state
+    {
+        PyObject *error;
+    };
+
+#define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
+    static PyMethodDef Pyk4aMethods[] = {
+        {"device_open", device_open, METH_VARARGS, "Open an Azure Kinect device"},
+        {"device_start_cameras", device_start_cameras, METH_VARARGS, "Starts color and depth camera capture"},
+        {"device_stop_cameras", device_stop_cameras, METH_VARARGS, "Stops the color and depth camera capture"},
+        {"device_start_imu", device_start_imu, METH_VARARGS, "Starts imu sernsors"},
+        {"device_stop_imu", device_stop_imu, METH_VARARGS, "Stops imu sernsors"},
+        {"device_get_capture", device_get_capture, METH_VARARGS, "Reads a sensor capture"},
+        {"capture_get_color_image", capture_get_color_image, METH_VARARGS, "Get the color image associated with the given capture"},
+        {"capture_get_depth_image", capture_get_depth_image, METH_VARARGS, "Set or add a depth image to the associated capture"},
+        {"capture_get_ir_image", capture_get_ir_image, METH_VARARGS, "Set or add a IR image to the associated capture"},
+        {"device_get_imu_sample", device_get_imu_sample, METH_VARARGS, "Reads an imu sample"},
+        {"device_close", device_close, METH_VARARGS, "Close an Azure Kinect device"},
+        {"device_get_sync_jack", device_get_sync_jack, METH_VARARGS, "Get the device jack status for the synchronization in and synchronization out connectors."},
+        {"device_get_color_control", device_get_color_control, METH_VARARGS, "Get device color control."},
+        {"device_set_color_control", device_set_color_control, METH_VARARGS, "Set device color control."},
+        {"device_get_color_control_capabilities", device_get_color_control_capabilities, METH_VARARGS, "Get device color control capabilities."},
+        {"device_get_calibration", device_get_calibration, METH_VARARGS, "Get device calibration handle."},
+        {"device_get_raw_calibration", device_get_raw_calibration, METH_VARARGS, "Get device calibration in text/json format."},
+        {"calibration_get_from_raw", calibration_get_from_raw, METH_VARARGS, "Create new calibration handle from raw json."},
+        {"transformation_create", transformation_create, METH_VARARGS, "Create transformation handle from calibration"},
+        {"transformation_depth_image_to_color_camera", transformation_depth_image_to_color_camera, METH_VARARGS, "Transforms the depth map into the geometry of the color camera."},
+        {"transformation_depth_image_to_color_camera_custom", transformation_depth_image_to_color_camera_custom, METH_VARARGS, "Transforms the custom & depth map into the geometry of the color camera."},
+        {"transformation_color_image_to_depth_camera", transformation_color_image_to_depth_camera, METH_VARARGS, "Transforms the color image into the geometry of the depth camera."},
+        {"transformation_depth_image_to_point_cloud", transformation_depth_image_to_point_cloud, METH_VARARGS, "Transforms the depth map to a point cloud."},
+        {"calibration_3d_to_3d", calibration_3d_to_3d, METH_VARARGS, "Transforms the coordinates between 2 3D systems"},
+        {"calibration_2d_to_3d", calibration_2d_to_3d, METH_VARARGS, "Transforms the coordinates between a pixel and a 3D system"},
+        {"playback_open", playback_open, METH_VARARGS, "Open file for playback"},
+        {"playback_close", playback_close, METH_VARARGS, "Close opened playback"},
+        {"playback_get_recording_length_usec", playback_get_recording_length_usec, METH_VARARGS, "Return recording length"},
+        {"playback_get_calibration", playback_get_calibration, METH_VARARGS, "Extract calibration and create handle from recording"},
+        {"playback_get_raw_calibration", playback_get_raw_calibration, METH_VARARGS, "Extract calibration json from recording"},
+        {"playback_seek_timestamp", playback_seek_timestamp, METH_VARARGS, "Seek playback file to specified position"},
+        {"playback_get_record_configuration", playback_get_record_configuration, METH_VARARGS, "Extract record configuration"},
+        {"playback_get_next_capture", playback_get_next_capture, METH_VARARGS, "Get next capture from playback"},
+        {"playback_get_previous_capture", playback_get_previous_capture, METH_VARARGS, "Get previous capture from playback"},
+        {"is_body_tracking_supported", is_body_tracking_supported, METH_VARARGS, "is_body_tracking_supported"},
+#ifdef ENABLE_BODY_TRACKING
+        {"body_tracker_create", body_tracker_create, METH_VARARGS, "init and return body tracker"},
+        {"capture_get_body_tracking", capture_get_body_tracking, METH_VARARGS, "Get the body tracking data associated with the given capture"},
+#endif
+        {NULL, NULL, 0, NULL}
+    };
+
+    static int pyk4a_traverse(PyObject *m, visitproc visit, void *arg)
+    {
+        Py_VISIT(GETSTATE(m)->error);
+        return 0;
+    }
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT, "k4a_module", NULL, sizeof(struct module_state), Pyk4aMethods, NULL,

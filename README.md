@@ -46,6 +46,16 @@ During execution, `k4a.dll` is required. The automatic detection should be able 
 It is also possible to specify the DLL's directory with the environment variable `K4A_DLL_DIR`.
 If `K4A_DLL_DIR` is used, the automatic DLL search is not performed.
 
+### Body Tracking SDK 
+
+Make sure the [body tracking SDK](https://docs.microsoft.com/en-us/azure/Kinect-dk/body-sdk-download) is installed properly. 
+
+Follow the regular installation for pyk4a but add these arguments to your pip call `--global-option="build_ext" --global-option="--enable-body-tracking"`
+
+For example, installing from branch feature/body-tracking, `pip install -v --no-use-pep517 --no-build-isolation --upgrade git+https://github.com/etiennedub/pyk4a.git@feature/body-tracking --global-option="build_ext" --global-option="-I/home/louis/p/pyk4a/k4abt/usr/include/" --global-option="-L/home/louis/p/pyk4a/k4abt/usr/lib/" --global-option="--enable-body-tracking"`
+
+For Windows with installing from branch feature/body-tracking,  `pip install -v --no-use-pep517 --global-option=build_ext --global-option="-IC:\Program Files\Azure Kinect SDK v1.4.1\sdk\include;C:\Program Files\Azure Kinect Body Tracking SDK\sdk\include" --global-option="-LC:\Program Files\Azure Kinect SDK v1.4.1\sdk\windows-desktop\amd64\release\lib;C:\Program Files\Azure Kinect Body Tracking SDK\sdk\windows-desktop\amd64\release\lib" --global-option="build_ext" --global-option="--enable-body-tracking" --upgrade git+https://github.com/etiennedub/pyk4a.git@feature/body-tracking`
+
 ## Example
 
 For a basic example displaying the first frame, you can run this code:
