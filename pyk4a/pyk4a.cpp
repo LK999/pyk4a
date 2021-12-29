@@ -1433,18 +1433,6 @@ static PyObject* is_body_tracking_supported(PyObject* self,PyObject* args) {
 #endif
     }
 
-
-static int pyk4a_traverse(PyObject *m, visitproc visit, void *arg) {
-  Py_VISIT(GETSTATE(m)->error);
-  return 0;
-}
-
-static int pyk4a_clear(PyObject *m) {
-  Py_CLEAR(GETSTATE(m)->error);
-  return 0;
-}
-
-
 #ifdef ENABLE_BODY_TRACKING
     const char* CAPSULE_BODY_TRACKER_NAME = "pyk4a body tracker handle";
     const char* CAPSULE_BODY_DATA_NAME = "pyk4a body data";
@@ -1659,6 +1647,16 @@ static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT, "k4a_module", NULL, sizeof(struct module_state), Pyk4aMethods, NULL,
     pyk4a_traverse,        pyk4a_clear,  NULL};
 
+static int pyk4a_traverse(PyObject *m, visitproc visit, void *arg) {
+  Py_VISIT(GETSTATE(m)->error);
+  return 0;
+}
+
+static int pyk4a_clear(PyObject *m) {
+  Py_CLEAR(GETSTATE(m)->error);
+  return 0;
+}
+  
 #define INITERROR return NULL
 PyMODINIT_FUNC PyInit_k4a_module(void) {
   import_array();
