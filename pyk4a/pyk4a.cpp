@@ -1423,6 +1423,16 @@ struct module_state {
   PyObject *error;
 };
 
+static PyObject* is_body_tracking_supported(PyObject* self,PyObject* args) {
+#ifdef ENABLE_BODY_TRACKING
+#pragma message("is_body_tracking_supported True")
+        return Py_True;
+#else
+#pragma message("is_body_tracking_supported False")
+        return Py_False;
+#endif
+    }
+
 #define GETSTATE(m) ((struct module_state *)PyModule_GetState(m))
 static PyMethodDef Pyk4aMethods[] = {
     {"device_open", device_open, METH_VARARGS, "Open an Azure Kinect device"},
@@ -1504,16 +1514,6 @@ static int pyk4a_clear(PyObject *m) {
   Py_CLEAR(GETSTATE(m)->error);
   return 0;
 }
-
-static PyObject* is_body_tracking_supported(PyObject* self,PyObject* args) {
-#ifdef ENABLE_BODY_TRACKING
-#pragma message("is_body_tracking_supported True")
-        return Py_True;
-#else
-#pragma message("is_body_tracking_supported False")
-        return Py_False;
-#endif
-    }
 
 
 #ifdef ENABLE_BODY_TRACKING
