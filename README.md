@@ -56,6 +56,9 @@ For example, installing from branch feature/body-tracking, `pip install -v --no-
 
 For Windows with installing from branch feature/body-tracking,  `pip install -v --no-use-pep517 --global-option=build_ext --global-option="-IC:\Program Files\Azure Kinect SDK v1.4.1\sdk\include;C:\Program Files\Azure Kinect Body Tracking SDK\sdk\include" --global-option="-LC:\Program Files\Azure Kinect SDK v1.4.1\sdk\windows-desktop\amd64\release\lib;C:\Program Files\Azure Kinect Body Tracking SDK\sdk\windows-desktop\amd64\release\lib" --global-option="build_ext" --global-option="--enable-body-tracking" --upgrade git+https://github.com/etiennedub/pyk4a.git@feature/body-tracking`
 
+Due to some DLL loading issue for GPU, please copy dlls from  `C:\Program Files\Azure Kinect Body Tracking SDK\tools`
+![pyk4a](https://github.com/lk999/pyk4a/raw/feature/body-tracking/figs/bt_sample.PNG) 
+
 ## Example
 
 For a basic example displaying the first frame, you can run this code:
