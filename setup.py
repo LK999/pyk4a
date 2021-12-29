@@ -84,6 +84,7 @@ class pyk4a_build_ext(build_ext):
         assert k4a_module in self.extensions
         if self.enable_body_tracking:
             k4a_module.libraries.append('k4abt')
+            k4a_module.libraries.append('directml') # For Body Tracking SDK 1.1.0
             k4a_module.define_macros.append(('ENABLE_BODY_TRACKING', '1'))
 
         build_ext.build_extensions(self)
