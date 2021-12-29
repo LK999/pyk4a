@@ -1643,9 +1643,6 @@ static PyMethodDef Pyk4aMethods[] = {
 #endif
     {NULL, NULL, 0, NULL}};
   
-static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT, "k4a_module", NULL, sizeof(struct module_state), Pyk4aMethods, NULL,
-    pyk4a_traverse,        pyk4a_clear,  NULL};
 
 static int pyk4a_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(GETSTATE(m)->error);
@@ -1656,6 +1653,10 @@ static int pyk4a_clear(PyObject *m) {
   Py_CLEAR(GETSTATE(m)->error);
   return 0;
 }
+  
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT, "k4a_module", NULL, sizeof(struct module_state), Pyk4aMethods, NULL,
+    pyk4a_traverse,        pyk4a_clear,  NULL};
   
 #define INITERROR return NULL
 PyMODINIT_FUNC PyInit_k4a_module(void) {
