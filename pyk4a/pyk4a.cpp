@@ -3,10 +3,10 @@
 
 #include <k4a/k4a.h>
 #include <k4arecord/playback.h>
+#include <k4abt.h>
 
 #ifdef ENABLE_BODY_TRACKING
-#warning "Body tracking enabled"
-#include <k4abt.h>
+#pragma message("Body tracking enabled")
 #define DATA_PER_JOINT 11
 #endif
 #include <stdio.h>
@@ -1229,10 +1229,10 @@ extern "C" {
 
     static PyObject* is_body_tracking_supported(PyObject* self,PyObject* args) {
 #ifdef ENABLE_BODY_TRACKING
-#warning "is_body_tracking_supported True"
+#pragma message("is_body_tracking_supported True")
         return Py_True;
 #else
-#warning "is_body_tracking_supported False"
+#pragma message("is_body_tracking_supported False")
         return Py_False;
 #endif
     }
